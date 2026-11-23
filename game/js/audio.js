@@ -1,46 +1,40 @@
-// Ember Sigils — WebAudio bleeps only. No audio files, no network.
-// The context is created on the first user gesture, so autoplay rules never bite.
+// Sigil Delve — sound, synthesized, no files.
+//
+// Every sound is a short WebAudio oscillator burst. There is no audio
+// asset to load, so the game stays a handful of static files and plays
+// offline. M toggles it; the choice is remembered for the session only.
+
 let ctx = null;
 let muted = false;
 
-export function unlockAudio() {
-  if (!ctx) {
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) ctx = new AC();
-    } catch {
-      ctx = null;
-    }
+export function isMuted() { return muted; }
+export function toggleMute() { muted = !muted; return muted; }
+
+function tone(freq, dur, type, gain, when = 0) {
+  if (muted) return;
+  try {
+    ctx ??= new (window.AudioContext || window.webkitAudioContext)();
+    const t = ctx.currentTime + when;
+    const osc = ctx.createOscillator();
+    const amp = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    amp.gain.setValueAtTime(gain, t);
+    amp.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(amp).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur);
+  } catch {
+    // No audio device, or the browser blocked it: the game plays on silent.
   }
-  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
-}
-
-export function toggleMute() {
-  muted = !muted;
-  return muted;
-}
-
-/** One short oscillator note: frequency, seconds, wave shape, volume. */
-function blip(freq, seconds, type, volume, when = 0) {
-  if (!ctx || muted) return;
-  const t0 = ctx.currentTime + when;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t0);
-  gain.gain.setValueAtTime(volume, t0);
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + seconds);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(t0);
-  osc.stop(t0 + seconds + 0.02);
 }
 
 export const sfx = {
-  play() { blip(520, 0.09, 'triangle', 0.16); blip(780, 0.07, 'triangle', 0.1, 0.05); },
-  hit() { blip(150, 0.18, 'sawtooth', 0.2); blip(90, 0.22, 'square', 0.12, 0.03); },
-  guard() { blip(340, 0.12, 'sine', 0.14); blip(440, 0.1, 'sine', 0.1, 0.06); },
-  surge() { blip(660, 0.08, 'sine', 0.12); blip(880, 0.08, 'sine', 0.12, 0.07); blip(1100, 0.1, 'sine', 0.1, 0.14); },
-  win() { [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.22, 'triangle', 0.16, i * 0.12)); },
-  lose() { [392, 330, 262, 196].forEach((f, i) => blip(f, 0.26, 'sine', 0.14, i * 0.14)); },
-  draw() { blip(600, 0.05, 'triangle', 0.07); },
+  play() { tone(520, 0.09, 'triangle', 0.12); },
+  hit() { tone(180, 0.14, 'sawtooth', 0.14); tone(90, 0.18, 'square', 0.08, 0.02); },
+  block() { tone(320, 0.1, 'sine', 0.12); },
+  heal() { tone(660, 0.12, 'sine', 0.1); tone(880, 0.16, 'sine', 0.08, 0.08); },
+  draft() { tone(440, 0.08, 'triangle', 0.1); tone(660, 0.08, 'triangle', 0.1, 0.07); tone(880, 0.12, 'triangle', 0.1, 0.14); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, i * 0.12)); },
+  loss() { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.25, 'sawtooth', 0.09, i * 0.14)); },
 };

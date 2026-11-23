@@ -63,5 +63,5 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Ember Sigils on http://localhost:${port}`);
+  console.log(`Sigil Delve on http://localhost:${port}`);
 });

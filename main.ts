@@ -1,17 +1,20 @@
-// Ember Sigils — the hand-in program (Node 22, standard library only).
+// Sigil Delve — the courier (Node 22, standard library only).
 //
-// What it does, in order: it prepares the output directory, copies game/ and
-// screenshots/ from beside this file into it, and writes /output/dossier.json
-// with buildDossier from the vendored make.fun library — the summary the
-// judge reads. It runs twice in grading and both runs must write the same
-// bytes, so nothing here depends on time, randomness, or the environment
-// beyond MAKEFUN_OUTPUT_DIR (which stands in for /output outside the grader).
+// This program carries the game to the grader. Given a fresh output
+// directory it places three things in it: the playable game under game/,
+// the staged screenshots under screenshots/, and dossier.json, the summary
+// the judge reads, built from the vendored make.fun library.
 //
-// Output prep is mount-safe on purpose: in the grader /output is a Docker
-// volume mount, and recursively deleting a mount point fails (EBUSY), which
-// used to kill the run with exit 1. This program never removes the output
-// directory itself — it only creates it and sweeps stale files out of it,
-// one entry at a time, tolerating entries that refuse to go.
+// The run is deterministic: run it twice and every byte is identical, so
+// nothing here reads the clock, rolls dice, or leans on the environment
+// except for MAKEFUN_OUTPUT_DIR (which stands in for /output when you run
+// it on your own machine).
+//
+// One deliberate quirk: in the grader /output is a Docker volume mount.
+// Deleting a mount point fails with EBUSY and used to kill the whole run
+// with exit 1, so this program never deletes the output directory itself.
+// It creates the directory if it is missing and clears out stale files
+// one entry at a time, skipping anything that refuses to go.
 //
 // Run it locally with:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -21,106 +24,83 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-// The scorer's caps, mirrored here so a bad entry fails loudly at build time
-// instead of silently at grading time.
-const DOSSIER_CAPS = {
+// The scorer's ceilings, copied here so a too-big game fails loudly at
+// build time instead of quietly at grading time.
+const OUTPUT_CAPS = Object.freeze({
   text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
+  screenshots: Object.freeze({ max: 4, max_bytes: 262144 }),
   game_max_files: 993,
   game_max_bytes: 50331648,
   game_path_max_bytes: 1000,
-};
+});
 
-/** Where the hand-in goes: /output in the grader, or MAKEFUN_OUTPUT_DIR locally. */
-function outputDir() {
-  return process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-}
-
-/**
- * Sweep stale entries out of an existing output directory, one entry at a
- * time. The directory itself is never removed: on a Docker volume mount
- * that fails with EBUSY and used to abort the whole run. An entry that
- * refuses to go (busy mount, permission) is skipped — the copy step below
- * overwrites same-named files anyway, and a leftover extra file is harmless
- * next to a freshly written dossier.
- */
-function clearDirContents(dir) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    try {
-      rmSync(join(dir, entry.name), { recursive: true, force: true });
-    } catch {
-      // Leave it: never let a stale file take the hand-in down with it.
-    }
-  }
-}
-
-/**
- * Prepare the output directory the mount-safe way: create it if missing,
- * then sweep its old contents. Mirrors the kit starter (mkdir-only) with
- * the sweep added so local re-runs never leak a stale file.
- */
-function prepareOutput(out) {
-  mkdirSync(out, { recursive: true });
-  try {
-    clearDirContents(out);
-  } catch {
-    // A directory we cannot even list is still usable as a copy target.
-  }
-}
-
-/** The repository root: the directory this file lives in. */
+// The directory this file was run from: the repository root.
 function repoRoot() {
   return fileURLToPath(new URL('.', import.meta.url));
 }
 
-/** Copy the whole game/ tree (index.html, css, js) into the output. */
-function copyGameFiles(root, out) {
+// /output inside the grader, or MAKEFUN_OUTPUT_DIR anywhere else.
+function outputDir() {
+  return process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+}
+
+// Empty an output directory without ever touching the directory itself.
+// Each entry is removed on its own and guarded, so a single stubborn file
+// (a busy mount, a permission quirk) cannot take the hand-in down.
+function sweepOutput(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    try {
+      rmSync(join(dir, entry.name), { recursive: true, force: true });
+    } catch {
+      // Stale files are overwritten by the copy below anyway.
+    }
+  }
+}
+
+// Make the output directory usable: create it when it is missing, then
+// sweep it. Mirrors the kit starter (create-only) with the sweep added so
+// a local re-run never leaks yesterday's files into today's hand-in.
+function ensureOutput(out) {
+  mkdirSync(out, { recursive: true });
+  try {
+    sweepOutput(out);
+  } catch {
+    // A directory we cannot even list is still a usable copy target.
+  }
+}
+
+// Recursively count the files and bytes under a directory.
+function measureTree(dir, acc = { files: 0, bytes: 0 }) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) measureTree(path, acc);
+    else if (entry.isFile()) {
+      acc.files += 1;
+      acc.bytes += statSync(path).size;
+    }
+  }
+  return acc;
+}
+
+// Refuse to hand in a game/ tree the scorer would refuse, listing every
+// violation at once instead of failing on the first one found.
+function checkCaps(root) {
+  const { files, bytes } = measureTree(join(root, 'game'));
+  const over = [];
+  if (files > OUTPUT_CAPS.game_max_files) over.push(`${files} files (cap ${OUTPUT_CAPS.game_max_files})`);
+  if (bytes > OUTPUT_CAPS.game_max_bytes) over.push(`${bytes} bytes (cap ${OUTPUT_CAPS.game_max_bytes})`);
+  if (over.length > 0) throw new Error(`game/ breaks the scorer caps: ${over.join('; ')}`);
+}
+
+// Copy the whole game/ tree (index.html, css, js) into the output.
+function copyGame(root, out) {
   const source = join(root, 'game');
   if (!existsSync(source)) throw new Error('game/ is missing from the repository');
   cpSync(source, join(out, 'game'), { recursive: true });
 }
 
-/**
- * Walk a tree and count its files and bytes, so the caps can be checked
- * early. Iterative (explicit stack) instead of recursive: deep game/ trees
- * cannot blow the call stack, and the walk stays easy to follow.
- */
-function countTree(dir) {
-  let files = 0;
-  let bytes = 0;
-  const pending = [dir];
-  while (pending.length > 0) {
-    const current = pending.pop();
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const path = join(current, entry.name);
-      if (entry.isDirectory()) {
-        pending.push(path);
-      } else if (entry.isFile()) {
-        files += 1;
-        bytes += statSync(path).size;
-      }
-    }
-  }
-  return { files, bytes };
-}
-
-/** Refuse to hand in a game/ tree the scorer would refuse. Both caps are checked before either throws, so one run reports every violation. */
-function assertGameWithinCaps(root) {
-  const { files, bytes } = countTree(join(root, 'game'));
-  const violations = [];
-  if (files > DOSSIER_CAPS.game_max_files) {
-    violations.push(`${files} files (cap ${DOSSIER_CAPS.game_max_files})`);
-  }
-  if (bytes > DOSSIER_CAPS.game_max_bytes) {
-    violations.push(`${bytes} bytes (cap ${DOSSIER_CAPS.game_max_bytes})`);
-  }
-  if (violations.length > 0) {
-    throw new Error(`game/ is over the scorer caps: ${violations.join('; ')}`);
-  }
-}
-
-/** Copy screenshots/ when it exists; the dossier caps how many and how big. */
-function copyScreenshots(root, out) {
+// Copy screenshots/ when it exists; the dossier caps how many and how big.
+function copyShots(root, out) {
   const source = join(root, 'screenshots');
   if (!existsSync(source)) return;
   const target = join(out, 'screenshots');
@@ -128,25 +108,22 @@ function copyScreenshots(root, out) {
   cpSync(source, target, { recursive: true });
 }
 
-/** Build the dossier from the copied files and write it as dossier.json. */
+// Build the dossier from the copied files and write it as dossier.json.
 function writeDossier(out) {
-  const dossier = buildDossier(out, DOSSIER_CAPS);
-  writeFileSync(join(out, 'dossier.json'), dossier);
+  writeFileSync(join(out, 'dossier.json'), buildDossier(out, OUTPUT_CAPS));
 }
 
-/**
- * The hand-in, start to finish: refuse an over-cap game/ early, prepare the
- * output directory without ever deleting it, copy the game and its
- * screenshots in, then write the dossier the judge reads.
- */
-function main() {
+// The courier, start to finish: check the caps before touching anything,
+// prepare the output directory without ever deleting it, copy the game
+// and its screenshots in, then write the dossier the judge reads.
+function run() {
   const root = repoRoot();
   const out = outputDir();
-  assertGameWithinCaps(root);
-  prepareOutput(out);
-  copyGameFiles(root, out);
-  copyScreenshots(root, out);
+  checkCaps(root);
+  ensureOutput(out);
+  copyGame(root, out);
+  copyShots(root, out);
   writeDossier(out);
 }
 
-main();
+run();

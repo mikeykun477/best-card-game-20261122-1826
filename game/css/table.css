@@ -1,144 +1,113 @@
-/* Ember Sigils — felt table, cards and overlays. All art is CSS: no images. */
+/* Sigil Delve — the table. Dark vault stone, gold sigils, cards you can read
+   at a glance. Everything is sized for a 1280x480 screenshot as well as a
+   desktop window: the hand is a single row, the log never scrolls the page. */
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  background: #17101f radial-gradient(ellipse at 50% 0%, #3a1c4d 0%, #17101f 70%);
-  color: #f5ead6;
+  background: #14101c radial-gradient(1000px 500px at 50% -10%, #2b2140, #14101c);
+  color: #f3ead8;
   font-family: Georgia, 'Times New Roman', serif;
   overflow: hidden;
-  user-select: none;
 }
-#table { width: 1280px; height: 480px; margin: 0 auto; position: relative; display: flex; flex-direction: column; }
+#app { height: 100%; display: flex; flex-direction: column; padding: 10px 16px; gap: 8px; }
 
-/* ---- top bar: both fighters ---- */
-#topbar { display: flex; align-items: stretch; gap: 12px; padding: 8px 14px 4px; }
-.fighter { flex: 1; background: rgba(0,0,0,.35); border: 1px solid #6b4d2a; border-radius: 10px; padding: 6px 12px; }
-.fighter-name { font-size: 17px; font-weight: bold; letter-spacing: .5px; }
-.sigil-dot { font-size: 15px; }
-.foe-dot { color: #ff7a4d; }
-.you-dot { color: #7fd4ff; }
-.hp-track { position: relative; height: 20px; margin-top: 5px; background: #241a2e; border-radius: 10px; overflow: hidden; border: 1px solid #000; }
-.hp-fill { height: 100%; width: 100%; transition: width .45s ease; }
-.foe-fill { background: linear-gradient(90deg, #c0392b, #ff6b4a); }
-.you-fill { background: linear-gradient(90deg, #1e7d46, #2ecc71); }
-.hp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000; }
-.charge-line { font-size: 12px; color: #d8c9a3; margin-top: 3px; }
-.charge-line b { color: #ffd76a; }
-#roundBox { width: 210px; text-align: center; padding-top: 4px; }
-#roundLabel { font-size: 20px; font-weight: bold; color: #ffd76a; letter-spacing: 2px; }
-#turnLabel { font-size: 13px; color: #e8d9b0; margin-top: 2px; }
+.hud {
+  display: flex; align-items: center; gap: 18px;
+  border-bottom: 2px solid #6b5426; padding-bottom: 8px;
+}
+.hud-title { font-size: 22px; letter-spacing: 3px; color: #f5c95c; font-weight: bold; }
+.hud-hp { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.hud-energy { font-size: 16px; color: #8fd3ff; }
+.hud-floor, .hud-deck { font-size: 14px; color: #c9b98a; }
 
-/* ---- hands ---- */
-#foeRow, #youRow { display: flex; justify-content: center; gap: 10px; padding: 2px 0; min-height: 96px; }
-#youRow { min-height: 158px; padding-bottom: 2px; }
+.bar {
+  position: relative; width: 180px; height: 18px;
+  background: #2a2138; border: 1px solid #6b5426; border-radius: 9px; overflow: hidden;
+}
+.bar-fill { height: 100%; background: linear-gradient(90deg, #c0392b, #e74c3c); }
+.bar.foe-hp .bar-fill { background: linear-gradient(90deg, #8e44ad, #c0392b); }
+.bar-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000;
+}
 
-/* ---- cards ---- */
+.table { flex: 1; display: flex; gap: 16px; min-height: 0; }
+.foe {
+  flex: 1; display: flex; gap: 16px; align-items: center;
+  background: #1e1829; border: 1px solid #4a3a68; border-radius: 12px; padding: 12px 18px;
+}
+.foe-glyph { font-size: 84px; line-height: 1; filter: drop-shadow(0 0 12px rgba(245, 201, 92, .35)); }
+.foe-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.foe-info h2 { font-size: 26px; color: #f5c95c; }
+.foe-flavor { font-size: 14px; font-style: italic; color: #b9a888; }
+.foe-info .bar { width: 320px; height: 20px; }
+.chips { display: flex; gap: 8px; }
+.chip {
+  font-size: 14px; padding: 2px 10px; border-radius: 12px; background: #2a2138;
+  border: 1px solid #6b5426;
+}
+.chip.block { color: #8fd3ff; }
+.chip.poison { color: #a5e08a; }
+.chip.bonus { color: #ff9d5c; }
+.intent { font-size: 16px; color: #ffb3b3; font-weight: bold; }
+
+.log {
+  width: 320px; background: #191423; border: 1px solid #4a3a68; border-radius: 12px;
+  padding: 10px 12px; overflow: hidden;
+}
+.log h3 { font-size: 13px; letter-spacing: 2px; color: #c9b98a; margin-bottom: 6px; }
+.log p { font-size: 13px; line-height: 1.45; color: #ddd2b8; margin-bottom: 4px; }
+
+.hand-row { display: flex; align-items: flex-end; gap: 12px; }
+.my-block {
+  align-self: center; font-size: 16px; color: #8fd3ff;
+  background: #1e2a3a; border: 1px solid #3a6a8a; border-radius: 10px; padding: 8px 12px;
+  white-space: nowrap;
+}
+.hand { flex: 1; display: flex; gap: 10px; justify-content: center; }
 .card {
-  width: 104px; height: 148px; border-radius: 10px; position: relative;
-  border: 2px solid #d8c9a3; background: linear-gradient(160deg, #fdf6e3, #e9dcc0);
-  color: #241a2e; cursor: pointer; flex: 0 0 auto;
-  box-shadow: 0 4px 10px rgba(0,0,0,.55);
-  transition: transform .16s ease, box-shadow .16s ease;
+  width: 128px; height: 168px; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(160deg, #f7efdc, #e8dcc0);
+  border: 2px solid #6b5426; color: #241a08;
+  display: flex; flex-direction: column; align-items: center; padding: 8px 6px;
+  font-family: Georgia, serif; position: relative;
+  box-shadow: 0 4px 0 #3a2c12, 0 6px 14px rgba(0, 0, 0, .5);
+  transition: transform .08s ease;
 }
-#youRow .card:hover { transform: translateY(-12px) rotate(-1deg); box-shadow: 0 12px 18px rgba(0,0,0,.65); }
-.card.playable { outline: 2px solid #ffd76a; outline-offset: 1px; }
+.card:hover { transform: translateY(-8px); }
+.card.cant { opacity: .55; }
 .card .cost {
-  position: absolute; top: 5px; left: 6px; width: 26px; height: 26px; border-radius: 50%;
-  background: #241a2e; color: #ffd76a; font-size: 15px; font-weight: bold;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute; top: -8px; left: -8px; width: 30px; height: 30px; border-radius: 50%;
+  background: #2b6cb0; color: #fff; font-weight: bold; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; border: 2px solid #dceaff;
 }
-.card .glyph { position: absolute; top: 34px; left: 0; right: 0; text-align: center; font-size: 42px; line-height: 1; }
-.card .cname { position: absolute; top: 84px; left: 0; right: 0; text-align: center; font-size: 13px; font-weight: bold; }
-.card .cvalue { position: absolute; top: 104px; left: 0; right: 0; text-align: center; font-size: 21px; font-weight: bold; }
-.card .cvalue small { font-size: 11px; font-weight: normal; }
-.card .ckey {
-  position: absolute; bottom: 4px; right: 7px; font-size: 11px; color: #7a6a4d;
-  border: 1px solid #b3a37e; border-radius: 4px; padding: 0 4px;
+.card .glyph { font-size: 40px; line-height: 1.1; }
+.card .name { font-size: 15px; font-weight: bold; margin-top: 4px; text-align: center; }
+.card .effect { font-size: 12px; line-height: 1.3; text-align: center; color: #4a3a20; margin-top: 4px; }
+.card .key {
+  position: absolute; bottom: 6px; right: 8px; font-size: 11px; color: #8a7a52;
+  border: 1px solid #b09a62; border-radius: 4px; padding: 0 5px;
 }
-.card .element-band { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; border-radius: 0 0 8px 8px; }
-.card.el-flame { border-color: #ff8a5c; } .card.el-flame .element-band { background: #e74c3c; }
-.card.el-wave  { border-color: #6db9e8; } .card.el-wave  .element-band { background: #2e86c1; }
-.card.el-stone { border-color: #c9a06a; } .card.el-stone .element-band { background: #8d6e63; }
-.card.el-gale  { border-color: #8fe3a0; } .card.el-gale  .element-band { background: #27ae60; }
-.card.el-flame .glyph { color: #d35400; }
-.card.el-wave  .glyph { color: #2471a3; }
-.card.el-stone .glyph { color: #6e4b2a; }
-.card.el-gale  .glyph { color: #1e8449; }
-.card.surge-card { background: linear-gradient(160deg, #fff7cf, #f0d98c); }
-.card.guard-card { background: linear-gradient(160deg, #e8eef7, #c3d2e8); }
+.end-btn, .big-btn {
+  cursor: pointer; border-radius: 10px; border: 2px solid #f5c95c;
+  background: #6b4d0f; color: #ffe9a8; font-family: Georgia, serif; font-weight: bold;
+}
+.end-btn { font-size: 16px; padding: 12px 18px; white-space: nowrap; }
+.end-btn:disabled { opacity: .4; cursor: default; }
+.big-btn { font-size: 18px; padding: 12px 26px; margin-top: 10px; }
+.hint { text-align: center; font-size: 12px; color: #8a7d5f; }
 
-/* opponent card backs — small, face down */
-.card.back {
-  width: 62px; height: 88px; cursor: default;
-  background:
-    repeating-linear-gradient(45deg, #5b2a86 0 8px, #3a1c5c 8px 16px);
-  border: 2px solid #ffd76a; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 8px rgba(0,0,0,.5);
+.overlay {
+  position: fixed; inset: 0; background: rgba(10, 6, 18, .82);
+  display: flex; align-items: center; justify-content: center; z-index: 10;
 }
-.card.back .back-glyph { font-size: 30px; color: #ffd76a; text-shadow: 0 0 8px rgba(255,215,106,.8); }
-.card.back:hover { transform: none; }
-
-/* played cards in the middle are smaller */
-.played-slot .card { width: 84px; height: 120px; pointer-events: none; }
-.played-slot .card .glyph { font-size: 34px; top: 28px; }
-.played-slot .card .cname { top: 68px; font-size: 11px; }
-.played-slot .card .cvalue { top: 84px; font-size: 17px; }
-.played-slot .card .ckey { display: none; }
-.played-slot .card .cost { width: 22px; height: 22px; font-size: 13px; }
-
-/* ---- midfield ---- */
-#midfield { display: flex; align-items: center; justify-content: center; gap: 18px; flex: 1; padding: 2px 14px; }
-.played-slot {
-  width: 150px; height: 132px; border: 2px dashed rgba(216,201,163,.45); border-radius: 12px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+.overlay-box {
+  background: #221a30; border: 2px solid #f5c95c; border-radius: 16px;
+  padding: 28px 36px; text-align: center; max-width: 640px;
+  box-shadow: 0 0 60px rgba(245, 201, 92, .25);
 }
-.slot-label { font-size: 12px; color: #cbbd97; letter-spacing: 1px; }
-.played-slot .slot-label { position: absolute; }
-.played-slot { position: relative; }
-.played-slot .card { position: relative; z-index: 1; }
-#clashBox {
-  flex: 1; max-width: 560px; background: rgba(0,0,0,.38); border: 1px solid #6b4d2a;
-  border-radius: 12px; padding: 8px 14px; text-align: center; min-height: 128px;
-}
-#clashTitle { font-size: 15px; letter-spacing: 3px; color: #ffd76a; font-weight: bold; }
-#clashLog { margin-top: 6px; font-size: 15px; line-height: 1.45; min-height: 66px; color: #f5ead6; }
-#clashLog .hit { color: #ff9a7a; font-weight: bold; }
-#clashLog .block { color: #9fd0ff; font-weight: bold; }
-#clashLog .boost { color: #ffd76a; font-weight: bold; }
-#cycleHint { font-size: 12px; color: #bfae83; margin-top: 4px; }
-
-/* ---- footer ---- */
-#helpbar {
-  display: flex; justify-content: space-between; padding: 4px 16px 6px;
-  font-size: 12.5px; color: #cbbd97; border-top: 1px solid rgba(216,201,163,.25);
-}
-#helpbar b { color: #ffd76a; }
-
-/* ---- overlays: title / win / loss ---- */
-#overlay {
-  position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(ellipse at 50% 40%, rgba(58,28,77,.92), rgba(10,6,16,.96));
-}
-#overlay.hidden { display: none; }
-#overlayCard { text-align: center; max-width: 760px; padding: 18px 30px; }
-#overlayKicker { font-size: 14px; letter-spacing: 4px; color: #ffd76a; }
-#overlayTitle { font-size: 64px; line-height: 1.05; margin: 6px 0 4px; text-shadow: 0 0 26px rgba(255,122,77,.55); }
-#overlayTitle.win { color: #ffd76a; text-shadow: 0 0 30px rgba(255,215,106,.8); }
-#overlayTitle.loss { color: #b8c4d8; text-shadow: 0 0 26px rgba(120,140,180,.7); }
-#overlayText { font-size: 17px; line-height: 1.5; color: #efe3c2; }
-#overlayStats { margin-top: 10px; font-size: 15px; color: #ffd76a; }
-#overlayButton {
-  margin-top: 16px; font-family: inherit; font-size: 20px; font-weight: bold; letter-spacing: 1px;
-  color: #241a2e; background: linear-gradient(180deg, #ffe9a8, #f5b942);
-  border: 2px solid #fff3cf; border-radius: 12px; padding: 10px 34px; cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0,0,0,.6);
-}
-#overlayButton:hover { transform: translateY(-2px); }
-#overlayHint { margin-top: 10px; font-size: 13px; color: #bfae83; }
-.howto { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
-.howto div {
-  background: rgba(0,0,0,.4); border: 1px solid #6b4d2a; border-radius: 10px;
-  padding: 8px 12px; font-size: 13.5px; line-height: 1.45; width: 170px;
-}
-.howto b { color: #ffd76a; }
+.overlay-box h2 { font-size: 30px; color: #f5c95c; letter-spacing: 2px; margin-bottom: 10px; }
+.overlay-box p { font-size: 16px; line-height: 1.5; color: #e6dcc2; margin-bottom: 6px; }
+.draft-row { display: flex; gap: 14px; justify-content: center; margin-top: 16px; }
+.draft-card { width: 150px; height: 190px; }

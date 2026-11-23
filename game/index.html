@@ -3,59 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ember Sigils — a duel of elemental cards</title>
+<title>Sigil Delve — a deckbuilding card delve</title>
 <link rel="stylesheet" href="css/table.css">
 </head>
 <body>
-<div id="table">
-  <header id="topbar">
-    <div class="fighter" id="foeBox">
-      <div class="fighter-name"><span class="sigil-dot foe-dot">✦</span> Pyra, Ember Warden</div>
-      <div class="hp-track"><div class="hp-fill foe-fill" id="foeHpFill"></div><span class="hp-text" id="foeHpText"></span></div>
-      <div class="charge-line">Sigil charge <b id="foeCharge">0</b> · Guard <b id="foeGuard">0</b></div>
-    </div>
-    <div id="roundBox">
-      <div id="roundLabel">ROUND 1</div>
-      <div id="turnLabel">Your move — play a card</div>
-    </div>
-    <div class="fighter" id="youBox">
-      <div class="fighter-name"><span class="sigil-dot you-dot">✦</span> You — Sigil Duelist</div>
-      <div class="hp-track"><div class="hp-fill you-fill" id="youHpFill"></div><span class="hp-text" id="youHpText"></span></div>
-      <div class="charge-line">Sigil charge <b id="youCharge">0</b> · Guard <b id="youGuard">0</b></div>
-    </div>
-  </header>
-
-  <section id="foeRow" aria-label="Opponent hand"></section>
-
-  <section id="midfield">
-    <div id="playedFoe" class="played-slot"><div class="slot-label">Pyra played</div></div>
-    <div id="clashBox">
-      <div id="clashTitle">⚔️ CLASH ⚔️</div>
-      <div id="clashLog"></div>
-      <div id="cycleHint">Flame &gt; Gale &gt; Stone &gt; Wave &gt; Flame — a beating element deals +2</div>
-    </div>
-    <div id="playedYou" class="played-slot"><div class="slot-label">You played</div></div>
-  </section>
-
-  <section id="youRow" aria-label="Your hand"></section>
-
-  <footer id="helpbar">
-    <span>Click a card or press <b>1–5</b> to play it</span>
-    <span>Enter / Space — start · R — restart</span>
-    <span id="deckLine"></span>
-  </footer>
-
-  <div id="overlay" class="hidden">
-    <div id="overlayCard">
-      <div id="overlayKicker"></div>
-      <h1 id="overlayTitle"></h1>
-      <p id="overlayText"></p>
-      <div id="overlayStats"></div>
-      <button id="overlayButton" type="button"></button>
-      <div id="overlayHint"></div>
-    </div>
-  </div>
-</div>
+<div id="app"></div>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

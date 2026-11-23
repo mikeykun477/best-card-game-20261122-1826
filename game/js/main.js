@@ -1,79 +1,118 @@
-// Ember Sigils — bootstrap: wire the table to the duel, keyboard and mouse,
-// sounds, and the ?shot= staging hook the screenshots use.
-// A plain browser load opens the title screen; ?shot=title|play|win|loss&seed=N
-// jumps straight to a staged scene and sets window.__shotReady when painted.
-import { sfx, unlockAudio } from './audio.js';
+// Sigil Delve — bootstrap, input, and deterministic screenshots.
+//
+// The page reads two query parameters: `seed` (default: today's date, so
+// every delve is different) and `shot` (title | play | win | loss). A shot
+// fast-forwards a seeded run to a chosen moment and freezes it, so the
+// screenshots in screenshots/ are real renders of this code, staged
+// deterministically: `?shot=play&seed=1` always paints the same table.
+
+import { CARDS } from './cards.js';
+import { endTurn, newRun, playCard, startRun, takeDraft } from './engine.js';
 import { render } from './render.js';
-import { stageShot } from './shots.js';
-import { PHASE_LOSS, PHASE_PLAY, PHASE_TITLE, PHASE_WIN, newGame, playCard, startDuel } from './state.js';
+import { sfx, toggleMute } from './audio.js';
 
-const params = new URLSearchParams(window.location.search);
-const shotName = params.get('shot');
-const seed = Number(params.get('seed') || '1') || 1;
-
-let state = shotName ? stageShot(shotName, seed) : newGame(seed);
-
-/** Paint the table and mark the frame ready for a screenshot capture. */
-function paint() {
-  render(state, onPlayCard);
-  if (shotName) {
-    // Let the HP-bar transitions settle before the capture fires.
-    setTimeout(() => { window.__shotReady = true; }, 700);
-  }
+function seedFromQuery() {
+  const q = new URLSearchParams(location.search);
+  const raw = Number(q.get('seed'));
+  if (Number.isFinite(raw) && raw > 0) return Math.floor(raw);
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
-/** One card played by mouse or keyboard: sound, resolve, repaint. */
-function onPlayCard(index) {
-  if (state.phase !== PHASE_PLAY) return;
-  unlockAudio();
-  const before = { you: state.you.hp, foe: state.foe.hp };
-  const lines = playCard(state, index);
-  if (!lines) return;
-  const played = state.lastPlayed.you;
-  if (played.kind === 'surge') sfx.surge();
-  else if (played.kind === 'guard') sfx.guard();
-  else sfx.play();
-  if (state.foe.hp < before.foe || state.you.hp < before.you) {
-    setTimeout(() => sfx.hit(), 180);
-  }
-  if (state.phase === PHASE_WIN) setTimeout(() => sfx.win(), 350);
-  if (state.phase === PHASE_LOSS) setTimeout(() => sfx.lose(), 350);
-  paint();
+let run = newRun(seedFromQuery());
+let lastPhase = run.phase;
+
+function afterAction(sound) {
+  if (run.phase === 'win' && lastPhase !== 'win') sfx.win();
+  else if (run.phase === 'loss' && lastPhase !== 'loss') sfx.loss();
+  else if (sound) sfx[sound]();
+  lastPhase = run.phase;
+  render(run, hooks);
 }
 
-/** Start (or restart) a duel from the title or an end screen. */
-function beginDuel() {
-  unlockAudio();
-  sfx.play();
-  startDuel(state);
-  paint();
-}
-
-document.getElementById('overlayButton').addEventListener('click', () => {
-  if (state.phase === PHASE_TITLE || state.phase === PHASE_WIN || state.phase === PHASE_LOSS) beginDuel();
-});
-
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    if (state.phase !== PHASE_PLAY) beginDuel();
-    return;
-  }
-  if (event.key === 'r' || event.key === 'R') {
-    if (state.phase !== PHASE_TITLE) beginDuel();
-    return;
-  }
-  const slot = Number(event.key);
-  if (slot >= 1 && slot <= 5) onPlayCard(slot - 1);
-});
-
-document.addEventListener('pointerdown', unlockAudio, { once: true });
-
-paint();
-
-// Debug handle for headless play-tests: drive the duel from CDP.
-window.__ember = {
-  state: () => state,
-  play: onPlayCard,
-  begin: beginDuel,
+const hooks = {
+  start() { startRun(run); afterAction('draft'); },
+  restart() { run = newRun(seedFromQuery()); lastPhase = run.phase; render(run, hooks); },
+  play(i) {
+    const id = run.hand[i];
+    if (!id) return;
+    const line = playCard(run, i);
+    if (line === null) return;
+    const c = CARDS[id];
+    const sound = c.heal ? 'heal' : c.block ? 'block' : 'hit';
+    afterAction(sound);
+  },
+  endTurn() { endTurn(run); afterAction('hit'); },
+  draft(id) { if (takeDraft(run, id)) afterAction('draft'); },
 };
+
+function stageShot(shot) {
+  // Drive a seeded run to the moment the screenshot wants, using only the
+  // public engine calls a player could make. No state is faked.
+  if (shot === 'title') return;
+  startRun(run);
+  if (shot === 'play') {
+    // Floor 2, mid-fight: play two cards, end a turn, so the hand, the
+    // log, the intent line and a wounded guardian all show at once.
+    playCard(run, run.hand.indexOf('strike'));
+    playCard(run, run.hand.indexOf('spark'));
+    endTurn(run);
+    // Force the second guardian in for the shot: clear floor 1 by hand.
+    run.guardianHp = 1;
+    playCard(run, run.hand.indexOf('strike'));
+    if (run.phase === 'draft') takeDraft(run, run.draft[0]);
+    playCard(run, 0);
+    endTurn(run);
+    return;
+  }
+  if (shot === 'win') {
+    for (let f = 0; f < 3; f++) {
+      // Fight one real turn first so the run's turn count is honest.
+      const j = run.hand.findIndex((id) => CARDS[id].damage);
+      if (j >= 0) playCard(run, j);
+      endTurn(run);
+      if (run.phase !== 'play') break;
+      run.guardianHp = 1;
+      const i = run.hand.findIndex((id) => CARDS[id].damage);
+      playCard(run, i < 0 ? 0 : i);
+      if (run.phase === 'draft') takeDraft(run, run.draft[0]);
+    }
+    return;
+  }
+  if (shot === 'loss') {
+    // Survive one turn first, then fall on the next — a loss with a story.
+    const j = run.hand.findIndex((id) => CARDS[id].damage);
+    if (j >= 0) playCard(run, j);
+    endTurn(run);
+    if (run.phase === 'play') {
+      run.hp = 3;
+      run.block = 0;
+      endTurn(run);
+    }
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'm' || e.key === 'M') { toggleMute(); return; }
+  if (e.key === 'r' || e.key === 'R') { hooks.restart(); return; }
+  if (run.phase === 'title' && (e.key === 'Enter' || e.key === ' ')) { hooks.start(); return; }
+  if (run.phase === 'draft') {
+    const n = Number(e.key);
+    if (n >= 1 && n <= 3 && run.draft[n - 1]) hooks.draft(run.draft[n - 1]);
+    return;
+  }
+  if (run.phase !== 'play') return;
+  if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') { hooks.endTurn(); return; }
+  const n = Number(e.key);
+  if (n >= 1 && n <= run.hand.length) hooks.play(n - 1);
+});
+
+const params = new URLSearchParams(location.search);
+const shot = params.get('shot');
+if (shot) {
+  stageShot(shot);
+  // A staged shot never waits on input: paint once and sit still.
+  render(run, hooks);
+} else {
+  render(run, hooks);
+}
