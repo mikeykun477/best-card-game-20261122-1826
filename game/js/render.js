@@ -150,13 +150,13 @@ export function render(run, hooks) {
   if (run.phase === 'win') {
     root.appendChild(overlay('win', '🏆 THE SIGILS ARE YOURS', [
       `You cleared all three floors with ${run.hp} HP to spare.`,
-      `${run.stats.turns} turns · ${run.stats.cardsPlayed} cards played · ${run.stats.damageDealt} damage dealt · ${run.stats.drafted} cards drafted.`,
+      `${run.stats.turns} turn${run.stats.turns === 1 ? '' : 's'} · ${run.stats.cardsPlayed} cards played · ${run.stats.damageDealt} damage dealt · ${run.stats.drafted} cards drafted.`,
     ], [{ label: 'Delve again  R', onClick: hooks.restart }]));
   }
   if (run.phase === 'loss') {
     root.appendChild(overlay('loss', 'THE VAULT CLAIMS YOU', [
       `You fell on floor ${run.floor + 1}, against the ${run.guardian.name}.`,
-      `${run.stats.turns} turns · ${run.stats.damageDealt} damage dealt · ${run.stats.drafted} cards drafted.`,
+      `${run.stats.turns} turn${run.stats.turns === 1 ? '' : 's'} · ${run.stats.damageDealt} damage dealt · ${run.stats.drafted} cards drafted.`,
     ], [{ label: 'Try again  R', onClick: hooks.restart }]));
   }
 }
